@@ -34,7 +34,7 @@
 #include "stm32f3xx_hal.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "fingerprint.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -105,9 +105,9 @@ int main(void)
   MX_USART2_UART_Init();
 
   /* USER CODE BEGIN 2 */
-  HAL_UART_Transmit_IT(&huart2, msg, 8);
+  HAL_UART_Transmit_IT(&huart2, (uint8_t*)msgFinger, 8);
   UART_RING_BUFFER_Init();
-  // HAL_UART_Receive_DMA(&huart1,finger_RxBuf,FINGER_UART_RX_BUFFER_SIZE);
+  HAL_UART_Receive_DMA(&huart1,(uint8_t*)finger_RxBuf,FINGER_UART_RX_BUFFER_SIZE);
   HAL_UART_Receive_DMA(&huart2,(uint8_t*)debug_RxBuf,DEBUG_UART_RX_BUFFER_SIZE);
   /* USER CODE END 2 */
 
@@ -119,9 +119,13 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
 	  if(UART_Aviable(&debugUart)>0){
-	  		  msg[0] = UART_Read(&debugUart);
-	  		  HAL_UART_Transmit_IT(&huart2, msg, 1);
-	  	  }
+	  	msg[0] = UART_Read(&debugUart);
+	  	HAL_UART_Transmit_IT(&huart1, msg, 1);
+	  }
+	  if(UART_Aviable(&fingerUart)>0){
+	 	msg[0] = UART_Read(&fingerUart);
+	 	HAL_UART_Transmit_IT(&huart2, msg, 1);
+	 }
   }
   /* USER CODE END 3 */
 
@@ -189,7 +193,7 @@ void MX_USART2_UART_Init(void)
 {
 
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 57600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;

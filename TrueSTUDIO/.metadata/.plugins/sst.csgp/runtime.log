@@ -1,0 +1,10 @@
+
+------------------------------------
+  Logging start.  ## CURRENT TIME  : [12/23, 2015   11:4  17.994]  ## COMMAND LINE  : 
+cmd /C "gen_csini.exe"
+------------------------------------
+[STD-IN] : C:\Users\Enkhbayar\Documents\STM32CUBE\MyNucleo\TimesheetSystem\TrueSTUDIO\.metadata\.plugins\sst.csgp\bin\env_vars.txt
+GUI is waiting for subprocess to be done...
+Execution done. EXIT CODE = 0
+  Logging finished.  ## CURRENT TIME  : [12/23, 2015   11:4  20.216]
+------------------------------------

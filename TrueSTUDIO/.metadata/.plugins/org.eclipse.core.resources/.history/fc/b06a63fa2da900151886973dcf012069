@@ -1,3 +1,0 @@
-#include "fingerprint.h"
-
-uint8_t msgFinger[8] ={'F','i','n','g','e','r','\r','\n'};

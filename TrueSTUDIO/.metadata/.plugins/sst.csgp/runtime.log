@@ -1,20 +1,30 @@
 
 ------------------------------------
-  Logging start.  ## CURRENT TIME  : [12/23, 2015   11:4  17.994]  ## COMMAND LINE  : 
+  Logging start.  ## CURRENT TIME  : [12/23, 2015   14:2  36.325]  ## COMMAND LINE  : 
 cmd /C "gen_csini.exe"
 ------------------------------------
 [STD-IN] : C:\Users\Enkhbayar\Documents\STM32CUBE\MyNucleo\TimesheetSystem\TrueSTUDIO\.metadata\.plugins\sst.csgp\bin\env_vars.txt
 GUI is waiting for subprocess to be done...
 Execution done. EXIT CODE = 0
-  Logging finished.  ## CURRENT TIME  : [12/23, 2015   11:4  20.216]
+  Logging finished.  ## CURRENT TIME  : [12/23, 2015   14:2  38.557]
 ------------------------------------
 
 ------------------------------------
-  Logging start.  ## CURRENT TIME  : [12/23, 2015   12:6  20.194]  ## COMMAND LINE  : 
+  Logging start.  ## CURRENT TIME  : [12/23, 2015   14:3  12.168]  ## COMMAND LINE  : 
 cmd /C "gen_csini.exe"
 ------------------------------------
 [STD-IN] : C:\Users\Enkhbayar\Documents\STM32CUBE\MyNucleo\TimesheetSystem\TrueSTUDIO\.metadata\.plugins\sst.csgp\bin\env_vars.txt
 GUI is waiting for subprocess to be done...
 Execution done. EXIT CODE = 0
-  Logging finished.  ## CURRENT TIME  : [12/23, 2015   12:6  22.401]
+  Logging finished.  ## CURRENT TIME  : [12/23, 2015   14:3  14.266]
+------------------------------------
+
+------------------------------------
+  Logging start.  ## CURRENT TIME  : [12/24, 2015   10:31  16.392]  ## COMMAND LINE  : 
+cmd /C "gen_csini.exe"
+------------------------------------
+[STD-IN] : C:\Users\Enkhbayar\Documents\STM32CUBE\MyNucleo\TimesheetSystem\TrueSTUDIO\.metadata\.plugins\sst.csgp\bin\env_vars.txt
+GUI is waiting for subprocess to be done...
+Execution done. EXIT CODE = 0
+  Logging finished.  ## CURRENT TIME  : [12/24, 2015   10:31  18.747]
 ------------------------------------

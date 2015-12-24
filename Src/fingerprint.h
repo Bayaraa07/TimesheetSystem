@@ -1,42 +1,81 @@
 #ifndef _FINGERPRINT_H
 #define _FINGERPRINT_H
 #include "stm32f3xx_hal.h"
-#define FG_UART		USART2
 
-#define TRUE  1
-#define FALSE 0
+#define FINGERPRINT_OK 0x00
+#define FINGERPRINT_PACKETRECIEVEERR 0x01
+#define FINGERPRINT_NOFINGER 0x02
+#define FINGERPRINT_IMAGEFAIL 0x03
+#define FINGERPRINT_IMAGEMESS 0x06
+#define FINGERPRINT_FEATUREFAIL 0x07
+#define FINGERPRINT_NOMATCH 0x08
+#define FINGERPRINT_NOTFOUND 0x09
+#define FINGERPRINT_ENROLLMISMATCH 0x0A
+#define FINGERPRINT_BADLOCATION 0x0B
+#define FINGERPRINT_DBRANGEFAIL 0x0C
+#define FINGERPRINT_UPLOADFEATUREFAIL 0x0D
+#define FINGERPRINT_PACKETRESPONSEFAIL 0x0E
+#define FINGERPRINT_UPLOADFAIL 0x0F
+#define FINGERPRINT_DELETEFAIL 0x10
+#define FINGERPRINT_DBCLEARFAIL 0x11
+#define FINGERPRINT_PASSFAIL 0x13
+#define FINGERPRINT_INVALIDIMAGE 0x15
+#define FINGERPRINT_FLASHERR 0x18
+#define FINGERPRINT_INVALIDREG 0x1A
+#define FINGERPRINT_ADDRCODE 0x20
+#define FINGERPRINT_PASSVERIFY 0x21
 
-//基本应答信息定义
-#define ACK_SUCCESS       0x00
-#define ACK_FAIL          0x01
-#define ACK_FULL          0x04
-#define ACK_NO_USER		  	0x05
-#define ACK_TIMEOUT       0x08
-#define ACK_GO_OUT		  	0x0F
+#define FINGERPRINT_STARTCODE 0xEF01
 
-//用户信息定义
-#define ACK_ALL_USER       	0x00
-#define ACK_GUEST_USER 	  	0x01
-#define ACK_NORMAL_USER 	  0x02
-#define ACK_MASTER_USER    	0x03
+#define FINGERPRINT_COMMANDPACKET 0x1
+#define FINGERPRINT_DATAPACKET 0x2
+#define FINGERPRINT_ACKPACKET 0x7
+#define FINGERPRINT_ENDDATAPACKET 0x8
 
-#define USER_MAX_CNT	   		40		//设置容量 MAX = 1000
+#define FINGERPRINT_TIMEOUT 0xFF
+#define FINGERPRINT_BADPACKET 0xFE
 
-//命令定义
-#define CMD_HEAD		  	0xF5
-#define CMD_TAIL		  	0xF5
-#define CMD_ADD_1  		  0x01
-#define CMD_ADD_2 		  0x02
-#define CMD_ADD_3	  	  0x03
-#define CMD_MATCH		  	0x0C
-#define CMD_DEL			  	0x04
-#define CMD_DEL_ALL		  0x05
-#define CMD_USER_CNT    0x09
-#define CMD_COM_LEV			0x28
-#define CMD_LP_MODE		  0x2C
-#define CMD_TIMEOUT		  0x2E
 
-#define CMD_FINGER_DETECTED 0x14
+#define FINGERPRINT_GETIMAGE 0x01
+#define FINGERPRINT_GETCHAR 0x02
+#define FINGERPRINT_LOWSPEEDSEARCH 0x04
+#define FINGERPRINT_REGMODEL 0x05
+#define FINGERPRINT_STORE 0x06
+#define FINGERPRINT_LOAD 0x07
+#define FINGERPRINT_UPLOAD 0x08
+#define FINGERPRINT_DELETE 0x0C
+#define FINGERPRINT_EMPTY 0x0D
+#define FINGERPRINT_VERIFYPASSWORD 0x13
+#define FINGERPRINT_HISPEEDSEARCH 0x1B
+#define FINGERPRINT_TEMPLATECOUNT 0x1D
+
+#define FINGERPRINT_DEBUG
+
+#define FINGERPRINT_DEFAULTTIMEOUT 5000  // milliseconds
+
 extern char *msgFinger;
+extern uint8_t finger_RxBuf[20];
+extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart2;
+extern uint16_t fingerID, matchScore, templateCount;
+
+
+uint8_t FINGERPRINT_VerifyPassword(void);
+void FINGERPRINT_WritePacket(uint32_t addr, uint8_t packettype, uint16_t len, uint8_t *packet);
+uint8_t FINGERPRINT_GetImage(void);
+uint8_t FINGERPRINT_GetChar(uint8_t slot);
+uint8_t FINGERPRINT_Search(void);
+
+uint8_t FINGERPRINT_GetTemplateCount(void);
+uint8_t FINGERPRINT_CreateModel(void);
+uint8_t FINGERPRINT_StoreModel(uint16_t id);
+uint8_t FINGERPRINT_DeleteModel(uint16_t id);
+//uint8_t FINGERPRINT_LoadModel(uint16_t id);
+//uint8_t FINGERPRINT_GetModel(void);
+//uint8_t FINGERPRINT_FastSearch(void);
+uint8_t FINGERPRINT_EmptyDatabase(void);
+
+
+
 #endif /*_FINGERPRINT_H*/
 

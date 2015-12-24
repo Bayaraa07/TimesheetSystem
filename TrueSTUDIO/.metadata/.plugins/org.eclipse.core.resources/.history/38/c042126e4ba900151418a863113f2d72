@@ -1,0 +1,42 @@
+#include "fingerprint.h"
+
+char *msgFinger ="FINGERPRINT_TIMEOUT\r\n";
+uint32_t fingerPassword = 0;
+uint32_t fingerAddress = 0xFFFFFFFF;
+
+uint8_t FINGERPRINT_VerifyPassword(void){
+	uint8_t packet[] = {FINGERPRINT_VERIFYPASSWORD,
+	                      (fingerPassword >> 24), (fingerPassword >> 16),
+	                      (fingerPassword >> 8), fingerPassword};
+	FINGERPRINT_WritePacket(fingerAddress, FINGERPRINT_COMMANDPACKET, 7, packet);
+
+	HAL_StatusTypeDef status = HAL_UART_Receive(&huart1,packet,12,FINGERPRINT_DEFAULTTIMEOUT);
+
+	if ((status == HAL_OK) && (packet[0] == FINGERPRINT_ACKPACKET) && (packet[1] == FINGERPRINT_OK))
+	    return 1;
+
+	if (status == HAL_TIMEOUT)
+	{
+	#ifdef FINGERPRINT_DEBUG
+		HAL_UART_Transmit_IT(&huart2,(uint8_t*)msgFinger,21);
+	#endif
+	}
+	return 0;
+}
+void FINGERPRINT_WritePacket(uint32_t addr, uint8_t packettype, uint16_t len, uint8_t *packet){
+	uint8_t tx_buffer[30];
+	tx_buffer[0]=(uint8_t)(FINGERPRINT_STARTCODE >> 8);
+	tx_buffer[1]=(uint8_t)FINGERPRINT_STARTCODE;
+	tx_buffer[2]=(uint8_t)(addr >> 24);
+	tx_buffer[3]=(uint8_t)(addr >> 16);
+	tx_buffer[4]=(uint8_t)(addr >> 8);
+	tx_buffer[5]=(uint8_t)addr;
+	tx_buffer[6]=(uint8_t)packettype;
+	tx_buffer[7]=(uint8_t)(len >> 8);
+	tx_buffer[8]=(uint8_t)len;
+	uint16_t sum = (len>>8) + (len&0xFF) + packettype;
+	for (uint8_t i=0; i< len-2; i++) {
+		tx_buffer[9+i]=(uint8_t)(packet[i]);
+		sum += packet[i];
+	}
+}

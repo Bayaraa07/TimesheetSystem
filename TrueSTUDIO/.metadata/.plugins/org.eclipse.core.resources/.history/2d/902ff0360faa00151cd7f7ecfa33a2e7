@@ -1,0 +1,636 @@
+/**
+ ******************************************************************************
+ * File Name          : main.c
+ * Description        : Main program body
+ ******************************************************************************
+ *
+ * COPYRIGHT(c) 2015 STMicroelectronics
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of STMicroelectronics nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ******************************************************************************
+ */
+/* Includes ------------------------------------------------------------------*/
+#include "stm32f3xx_hal.h"
+
+/* USER CODE BEGIN Includes */
+#include "string.h"
+#include "fingerprint.h"
+/* USER CODE END Includes */
+
+/* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
+
+/* USER CODE BEGIN PV */
+/* Private variables ---------------------------------------------------------*/
+#define DEBUG_UART_RX_BUFFER_SIZE 8     /* 2,4,8,16,32,64,128 or 256 bytes */
+#define FINGER_UART_RX_BUFFER_SIZE 20     /* 2,4,8,16,32,64,128 or 256 bytes */
+uint8_t debug_RxBuf[DEBUG_UART_RX_BUFFER_SIZE];
+uint8_t finger_RxBuf[FINGER_UART_RX_BUFFER_SIZE];
+
+typedef struct {
+	uint8_t mask;
+	uint8_t size;
+	uint8_t tail;
+	uint8_t *rxBuf;
+	UART_HandleTypeDef *huart;
+} UART_RING_BufferTypeDef;
+
+UART_RING_BufferTypeDef debugUart;
+UART_RING_BufferTypeDef fingerUart;
+
+uint8_t msg[8] = { 'H', 'e', 'l', 'l', 'o', '!', '\r', '\n' };
+uint16_t fingerID, matchScore, templateCount;
+uint8_t switchType = 's';
+uint16_t fingerEnrollId = 3;
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_USART2_UART_Init(void);
+
+/* USER CODE BEGIN PFP */
+/* Private function prototypes -----------------------------------------------*/
+void UART_RING_BUFFER_Init(void);
+uint8_t UART_Aviable(UART_RING_BufferTypeDef *ringBuf);
+unsigned char UART_Read(UART_RING_BufferTypeDef *ringBuf);
+uint8_t getFingerprintIDez(void);
+uint8_t getFingerprintEnroll(void);
+uint8_t deleteFingerprint(uint8_t id);
+/* USER CODE END PFP */
+
+/* USER CODE BEGIN 0 */
+
+/* USER CODE END 0 */
+
+int main(void) {
+
+	/* USER CODE BEGIN 1 */
+
+	/* USER CODE END 1 */
+
+	/* MCU Configuration----------------------------------------------------------*/
+
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
+
+	/* Configure the system clock */
+	SystemClock_Config();
+
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_DMA_Init();
+	MX_USART1_UART_Init();
+	MX_USART2_UART_Init();
+
+	/* USER CODE BEGIN 2 */
+	HAL_UART_Transmit_IT(&huart2, (uint8_t*) msg, 8);
+	UART_RING_BUFFER_Init();
+	//HAL_UART_Receive_DMA(&huart1,(uint8_t*)finger_RxBuf,FINGER_UART_RX_BUFFER_SIZE);
+	HAL_UART_Receive_DMA(&huart2, (uint8_t*) debug_RxBuf,
+	DEBUG_UART_RX_BUFFER_SIZE);
+
+	if (FINGERPRINT_VerifyPassword() == HAL_OK) {
+		char *debugMsg = "Found fingerprint sensor!";
+		HAL_UART_Transmit_IT(&huart2, (uint8_t*) debugMsg, strlen(debugMsg));
+	} else {
+		char *debugMsg = "Did not find fingerprint sensor :(";
+		HAL_UART_Transmit_IT(&huart2, (uint8_t*) debugMsg, strlen(debugMsg));
+	}
+
+	/* USER CODE END 2 */
+
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+	while (1) {
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
+
+		if (UART_Aviable(&debugUart) > 0) {
+			msg[0] = UART_Read(&debugUart);
+			switchType = msg[0];
+			HAL_UART_Transmit_IT(&huart2, msg, 1);
+		}
+		/* if(UART_Aviable(&fingerUart)>0){
+		 msg[0] = UART_Read(&fingerUart);
+		 HAL_UART_Transmit_IT(&huart2, msg, 1);
+		 }
+		 */
+		switch (switchType) {
+		case 's':
+			getFingerprintIDez();
+			break;
+		case 'n':
+			HAL_UART_Receive(msg, 1, 1000);
+			fingerEnrollId = msg[0] - '0';
+			getFingerprintEnroll();
+			switchType = 's';
+			break;
+		case 'd':
+			HAL_UART_Receive(msg, 1, 1000);
+			uint8_t deleteId = msg[0] - '0';
+			deleteFingerprint(deleteId);
+			switchType = 's';
+			break;
+		default:
+			break;
+		}
+		HAL_Delay(100);
+	}
+	/* USER CODE END 3 */
+
+}
+
+/** System Clock Configuration
+ */
+void SystemClock_Config(void) {
+
+	RCC_OscInitTypeDef RCC_OscInitStruct;
+	RCC_ClkInitTypeDef RCC_ClkInitStruct;
+	RCC_PeriphCLKInitTypeDef PeriphClkInit;
+
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	RCC_OscInitStruct.HSICalibrationValue = 16;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+	RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
+	HAL_RCC_OscConfig(&RCC_OscInitStruct);
+
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1
+			| RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+	HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+
+	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1
+			| RCC_PERIPHCLK_USART2;
+	PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+	PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+
+	HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000);
+
+	HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+
+	/* SysTick_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+}
+
+/* USART1 init function */
+void MX_USART1_UART_Init(void) {
+
+	huart1.Instance = USART1;
+	huart1.Init.BaudRate = 57600;
+	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+	huart1.Init.StopBits = UART_STOPBITS_1;
+	huart1.Init.Parity = UART_PARITY_NONE;
+	huart1.Init.Mode = UART_MODE_TX_RX;
+	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart1.Init.OneBitSampling = UART_ONEBIT_SAMPLING_DISABLED;
+	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart1);
+
+}
+
+/* USART2 init function */
+void MX_USART2_UART_Init(void) {
+
+	huart2.Instance = USART2;
+	huart2.Init.BaudRate = 57600;
+	huart2.Init.WordLength = UART_WORDLENGTH_8B;
+	huart2.Init.StopBits = UART_STOPBITS_1;
+	huart2.Init.Parity = UART_PARITY_NONE;
+	huart2.Init.Mode = UART_MODE_TX_RX;
+	huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart2.Init.OneBitSampling = UART_ONEBIT_SAMPLING_DISABLED;
+	huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart2);
+
+}
+
+/** 
+ * Enable DMA controller clock
+ */
+void MX_DMA_Init(void) {
+	/* DMA controller clock enable */
+	__DMA1_CLK_ENABLE()
+	;
+
+	/* DMA interrupt init */
+	HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+
+}
+
+/** Configure pins as 
+ * Analog
+ * Input
+ * Output
+ * EVENT_OUT
+ * EXTI
+ */
+void MX_GPIO_Init(void) {
+
+	GPIO_InitTypeDef GPIO_InitStruct;
+
+	/* GPIO Ports Clock Enable */
+	__GPIOC_CLK_ENABLE()
+	;
+	__GPIOF_CLK_ENABLE()
+	;
+	__GPIOA_CLK_ENABLE()
+	;
+	__GPIOB_CLK_ENABLE()
+	;
+
+	/*Configure GPIO pin : B1_Pin */
+	GPIO_InitStruct.Pin = B1_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : LD2_Pin */
+	GPIO_InitStruct.Pin = LD2_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_LOW;
+	HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+
+}
+
+/* USER CODE BEGIN 4 */
+void UART_RING_BUFFER_Init(void) {
+	debugUart.huart = &huart2;
+	debugUart.mask = DEBUG_UART_RX_BUFFER_SIZE - 1;
+	debugUart.rxBuf = debug_RxBuf;
+	debugUart.tail = 0;
+	debugUart.size = DEBUG_UART_RX_BUFFER_SIZE;
+	fingerUart.huart = &huart1;
+	fingerUart.mask = FINGER_UART_RX_BUFFER_SIZE - 1;
+	fingerUart.rxBuf = finger_RxBuf;
+	fingerUart.tail = 0;
+	fingerUart.size = FINGER_UART_RX_BUFFER_SIZE;
+}
+
+uint8_t UART_Aviable(UART_RING_BufferTypeDef *ringBuf) {
+	return (ringBuf->tail
+			!= (ringBuf->size - ringBuf->huart->hdmarx->Instance->CNDTR));
+}
+
+unsigned char UART_Read(UART_RING_BufferTypeDef *ringBuf) {
+	unsigned char tmptail;
+
+	if ((ringBuf->size - ringBuf->huart->hdmarx->Instance->CNDTR)
+			== ringBuf->tail) /* hooson bol -1 -g butsaana */
+		return -1;
+	tmptail = ringBuf->tail;
+	ringBuf->tail = (ringBuf->tail + 1) & ringBuf->mask; // index aa tootsooloh;
+
+	return ringBuf->rxBuf[tmptail]; /* Return data */
+}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+}
+uint8_t getFingerprintIDez() {
+	char temp[50];
+	uint8_t p = FINGERPRINT_GetImage();
+	switch (p) {
+	case FINGERPRINT_OK:
+		sprintf(temp, "Image taken\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_NOFINGER:
+		sprintf(temp, "No finger detected\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_PACKETRECIEVEERR:
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_IMAGEFAIL:
+		sprintf(temp, "Imaging error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	default:
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+
+	p = FINGERPRINT_GetChar(1);
+	switch (p) {
+	case FINGERPRINT_OK:
+		sprintf(temp, "Image converted\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_IMAGEMESS:
+		sprintf(temp, "Image too messy\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_PACKETRECIEVEERR:
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_FEATUREFAIL:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_INVALIDIMAGE:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	default:
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+
+	p = FINGERPRINT_Search();
+	if (p == FINGERPRINT_OK) {
+		sprintf(temp, "Found a print match!\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	} else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else if (p == FINGERPRINT_NOTFOUND) {
+		sprintf(temp, "Did not find a match\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else {
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+
+	// found a match!
+	sprintf(temp, "Found ID # %d with matchScore of %d \r\n", fingerID,
+			matchScore);
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	return 1;
+}
+
+uint8_t getFingerprintEnroll() {
+	uint8_t p = -1;
+	char temp[50];
+	sprintf(temp, "Waiting for valid finger to enroll as #%d \r\n",
+			fingerEnrollId);
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	while (p != FINGERPRINT_OK) {
+		p = FINGERPRINT_GetImage();
+		switch (p) {
+		case FINGERPRINT_OK:
+			sprintf(temp, "Image taken\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_NOFINGER:
+			sprintf(temp, ".");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_PACKETRECIEVEERR:
+			sprintf(temp, "Communication error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_IMAGEFAIL:
+			sprintf(temp, "Imaging error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		default:
+			sprintf(temp, "Unknown error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		}
+	}
+
+	// OK success!
+
+	p = FINGERPRINT_GetChar(1);
+	switch (p) {
+	case FINGERPRINT_OK:
+		sprintf(temp, "Image converted\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_IMAGEMESS:
+		sprintf(temp, "Image too messy\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_PACKETRECIEVEERR:
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_FEATUREFAIL:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_INVALIDIMAGE:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	default:
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+	sprintf(temp, "Remove finger\r\n");
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	HAL_Delay(2000);
+	p = 0;
+	while (p != FINGERPRINT_NOFINGER) {
+		p = FINGERPRINT_GetImage();
+	}
+	sprintf(temp, "ID %d \r\n", fingerEnrollId);
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	p = -1;
+	sprintf(temp, "Place same finger again\r\n");
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	while (p != FINGERPRINT_OK) {
+		p = FINGERPRINT_GetImage();
+		switch (p) {
+		case FINGERPRINT_OK:
+			sprintf(temp, "Image taken\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_NOFINGER:
+			sprintf(temp, ".");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_PACKETRECIEVEERR:
+			sprintf(temp, "Communication error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		case FINGERPRINT_IMAGEFAIL:
+			sprintf(temp, "Imaging error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		default:
+			sprintf(temp, "Unknown error\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+			break;
+		}
+	}
+
+	// OK success!
+
+	p = FINGERPRINT_GetChar(2);
+	switch (p) {
+	case FINGERPRINT_OK:
+		sprintf(temp, "Image converted\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_IMAGEMESS:
+		sprintf(temp, "Image too messy\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_PACKETRECIEVEERR:
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_FEATUREFAIL:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	case FINGERPRINT_INVALIDIMAGE:
+		sprintf(temp, "Could not find fingerprint features\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	default:
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+
+	// OK converted!
+	sprintf(temp, "Creating model for #%d\r\n", fingerEnrollId);
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+
+	p = FINGERPRINT_CreateModel();
+	if (p == FINGERPRINT_OK) {
+		sprintf(temp, "Prints matched!\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	} else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else if (p == FINGERPRINT_ENROLLMISMATCH) {
+
+		sprintf(temp, "Fingerprints did not match\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else {
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+	sprintf(temp, "ID %d \r\n", fingerEnrollId);
+	HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	p = FINGERPRINT_StoreModel(fingerEnrollId);
+	if (p == FINGERPRINT_OK) {
+		sprintf(temp, "Stored!\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+	} else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else if (p == FINGERPRINT_BADLOCATION) {
+		sprintf(temp, "Could not store in that location\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else if (p == FINGERPRINT_FLASHERR) {
+		sprintf(temp, "Error writing to flash\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	} else {
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		return p;
+	}
+	return p;
+}
+uint8_t deleteFingerprint(uint8_t id) {
+	uint8_t p = FINGERPRINT_DeleteModel(id);
+	switch (p) {
+	case FINGERPRINT_OK:
+		sprintf(temp, "delete success\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_PACKETRECIEVEERR:
+		sprintf(temp, "Communication error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	case FINGERPRINT_DELETEFAIL:
+		sprintf(temp, "faile to delete templates\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	default:
+		sprintf(temp, "Unknown error\r\n");
+		HAL_UART_Transmit(&huart2, (uint8_t*) temp, strlen(temp), 1000);
+		break;
+	}
+	return p;
+}
+
+/* USER CODE END 4 */
+
+#ifdef USE_FULL_ASSERT
+
+/**
+ * @brief Reports the name of the source file and the source line number
+ * where the assert_param error has occurred.
+ * @param file: pointer to the source file name
+ * @param line: assert_param error line source number
+ * @retval None
+ */
+void assert_failed(uint8_t* file, uint32_t line)
+{
+	/* USER CODE BEGIN 6 */
+	/* User can add his own implementation to report the file name and line number,
+	 ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+	/* USER CODE END 6 */
+
+}
+
+#endif
+
+/**
+ * @}
+ */
+
+/**
+ * @}
+ */
+
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
